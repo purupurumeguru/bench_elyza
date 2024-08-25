@@ -1,0 +1,4 @@
+llama-cpp-python==0.2.89
+huggingface-hub==0.24.6
+datasets==2.21.0
+openai==1.42.0
