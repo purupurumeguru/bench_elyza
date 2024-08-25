@@ -152,7 +152,7 @@ def judge_elyza_local(judge_prompt, eval_results, judge_inference_settings=None)
 
     return judge_results
 
-def judge_elyza_gpt(judge_prompt, eval_results, judge_inference_settings=None):
+def judge_elyza_gpt(judge_prompt, eval_results, judge_model="gpt-4o-mini", judge_inference_settings=None):
     if judge_inference_settings is None:
         judge_inference_settings = {
             "max_tokens": 1,
@@ -173,7 +173,7 @@ def judge_elyza_gpt(judge_prompt, eval_results, judge_inference_settings=None):
         )
 
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=judge_model,
             messages=[
                 {"role": "system", "content": "You are an AI assistant that evaluates responses based on given criteria."},
                 {"role": "user", "content": prompt}
