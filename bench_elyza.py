@@ -75,7 +75,7 @@ def add_role(prompt, repo_id):
 def eval_elyza(repo_id, filename, inference_settings=None):
     if inference_settings is None:
         inference_settings = {
-            "max_tokens": 10,
+            "max_tokens": 1024,
             "temperature": 1.0,
             "seed": 314159265,
             "stop": ["Q:", "User"],
@@ -198,13 +198,17 @@ def judge_elyza_gpt(judge_prompt, eval_results, judge_model="gpt-4o-mini", judge
 
     return judge_results
 
+def save_to_json(output_dir, filename, data):
+    os.makedirs(output_dir, exist_ok=True)
+    with open(os.path.join(output_dir, filename), "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
 def save_results(results, model_name):
     output_dir = f"results/{model_name}/"
     os.makedirs(output_dir, exist_ok=True)
 
     # Save JSON
-    with open(f"{output_dir}/results.json", "w", encoding="utf-8") as f:
-        json.dump(results, f, ensure_ascii=False, indent=2)
+    save_to_json(f"{output_dir}/results.json", results)
 
     # Save Markdown
     with open(f"{output_dir}/README.md", "w", encoding="utf-8") as f:
@@ -270,7 +274,7 @@ def bench_elyza(repo_id, filename, judge_model="gpt-4o-mini", seed=314159265):
     model_name = f"{repo_id}/{filename}".replace("/", "_")
 
     inference_settings = {
-        "max_tokens": 1000,
+        "max_tokens": 1024,
         "temperature": 1.0,
         "seed": seed,
         "stop": ["Q:", "User"],
@@ -283,12 +287,12 @@ def bench_elyza(repo_id, filename, judge_model="gpt-4o-mini", seed=314159265):
     }
 
     eval_results = eval_elyza(repo_id=repo_id, filename=filename, inference_settings=inference_settings)
+    save_to_json(output_dir=f"results/{model_name}/", filename="results.json", data=eval_results)
 
     if "gpt" in judge_model:
         judge_results = judge_elyza_gpt(judge_prompt, eval_results, judge_model=judge_model, judge_inference_settings=judge_inference_setteing)
     else:
         judge_results = judge_elyza_local(judge_prompt, eval_results, judge_inference_settings=judge_inference_setteing)
-
 
     save_results(judge_results, model_name=model_name)
 
