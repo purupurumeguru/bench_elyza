@@ -49,8 +49,8 @@ Thumbs.db
 
 # Project specific
 *.log
-*.gguf
 *.bin
+./*.gguf
 
 # Jupyter Notebook
 .ipynb_checkpoints
