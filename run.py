@@ -1,6 +1,6 @@
-from bench_elyza import bench_elyza
+from bench_elyza import bench_elyza_local, bench_elyza_api
 
-def run_models():
+def run_local_models():
     judge_model = "gpt-4o-mini"
     seed = 314159265
     model_list = [
@@ -12,8 +12,22 @@ def run_models():
     ]
 
     for repo_id, filename in model_list:
-        bench_elyza(repo_id=repo_id, filename=filename, judge_model=judge_model, seed=seed)
+        bench_elyza_local(repo_id=repo_id, filename=filename, judge_model=judge_model, seed=seed)
+    return
+
+def run_api_models():
+    judge_model = "gpt-4o-mini"
+    seed = 314159265
+    model_list = [
+        "gpt-4o-mini",
+        "gpt-4o",
+        "claude-3-5-sonnet-20240620",
+    ]
+
+    for model in model_list:
+        bench_elyza_api(model=model, judge_model=judge_model, seed=seed)
     return
 
 if __name__ == "__main__":
-    run_models()
+    run_local_models()
+    run_api_models()
