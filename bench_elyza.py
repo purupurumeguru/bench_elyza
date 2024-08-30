@@ -1,10 +1,15 @@
-import argparse
 import json
 import os
 import re
+import time
+
+import argparse
+import anthropic
 from datasets import load_dataset
 from llama_cpp import Llama
+import openai
 from openai import OpenAI
+
 
 judge_prompt = """問題, 正解例, 採点基準, 言語モデルが生成した回答が与えられます。
 
@@ -70,7 +75,7 @@ def load_model(repo_id, filename):
     )
     return model
 
-def eval_elyza(repo_id, filename, inference_settings=None):
+def eval_elyza_local(repo_id, filename, inference_settings=None):
     if inference_settings is None:
         inference_settings = {
             "max_tokens": 1024,
@@ -113,6 +118,100 @@ def eval_elyza(repo_id, filename, inference_settings=None):
 
     return eval_results
 
+
+def call_chat_api(prompt, model, max_tokens=1024, temperture=1, seed=314159265, is_return_raw=False, max_retries=3, retry_delay=5, system_prompt=None):
+    if "claude" in model:
+        return call_claude_api(prompt, model, max_tokens, temperture, seed, is_return_raw, max_retries, retry_delay, system_prompt)
+    else:
+        return call_gpt_api(prompt, model, max_tokens, temperture, seed, is_return_raw, max_retries, retry_delay, system_prompt)
+
+def call_claude_api(prompt, model="claude-3-5-sonnet-20240620", max_tokens=1024, temperture=1, seed=314159265, is_return_raw=False, max_retries=3, retry_delay=5, system_prompt=None):
+    if system_prompt is None:
+        system_prompt = "あなたは誠実で優秀な日本人のアシスタントです。"
+
+    client = anthropic.Anthropic()
+    messages = [{"role": "user", "content": prompt}]
+
+    for attempt in range(max_retries):
+        try:
+            completion = client.messages.create(
+                model=model,
+                messages=messages,
+                max_tokens=max_tokens,
+                temperature=temperture,
+                seed=seed,
+                system=system_prompt,
+            )
+            return completion if is_return_raw else completion.content[0].text
+        except Exception as e:
+            if attempt < max_retries - 1:
+                print(f"Error occurred: {e}. Retrying {attempt + 1}/{max_retries}...")
+                time.sleep(retry_delay)
+            else:
+                return f"Failed to get a response after {max_retries} attempts."
+
+def call_gpt_api(prompt, model="gpt-4o-mini", max_tokens=1024, temperture=1, seed=314159265, is_return_raw=False, max_retries=3, retry_delay=5, system_prompt=None):
+    if system_prompt is None:
+        system_prompt = "あなたは誠実で優秀な日本人のアシスタントです。"
+
+    client = openai.OpenAI()
+    messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": prompt}]
+
+    for attempt in range(max_retries):
+        try:
+            completion = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                max_tokens=max_tokens,
+                temperature=temperture,
+                seed=seed,
+            )
+            return completion if is_return_raw else completion.choices[0].message.content
+        except Exception as e:
+            if attempt < max_retries - 1:
+                print(f"Error occurred: {e}. Retrying {attempt + 1}/{max_retries}...")
+                time.sleep(retry_delay)
+            else:
+                return f"Failed to get a response after {max_retries} attempts."
+
+def eval_elyza_api(model_name, max_retries=3, retry_delay=5, inference_settings=None):
+    if inference_settings is None:
+        inference_settings = {
+            "max_tokens": 1024,
+            "temperature": 1.0,
+            "seed": 314159265,
+        }
+
+    elyza_dataset = load_dataset("elyza/ELYZA-tasks-100")
+    eval_results = []
+    system_prompt = "あなたは誠実で優秀な日本人のアシスタントです。"
+
+    for i, test_data in enumerate(elyza_dataset["test"]):
+        input_data = test_data["input"]
+        output = call_chat_api(
+            prompt=input_data,
+            model=model_name,
+            max_tokens=max_tokens,
+            is_return_raw=False,
+            max_retries=max_retries,
+            retry_delay=retry_delay,
+            system_prompt=system_prompt
+        )
+
+        print(f"Data {i+1}: ")
+        print(f"Input: {input_data}")
+        print(f"Output: {output}")
+        print("-" * 100, flush=True)
+
+        eval_results.append({
+            "input": input_data,
+            "sample_output": test_data["output"],
+            "model_output": output,
+            "eval_aspect": test_data["eval_aspect"],
+        })
+
+    return eval_results
+
 def judge_elyza_local(judge_prompt, eval_results, judge_inference_settings=None):
     if judge_inference_settings == None:
         judge_inference_settings = {
@@ -140,9 +239,9 @@ def judge_elyza_local(judge_prompt, eval_results, judge_inference_settings=None)
             **judge_inference_settings,
         )
         score = output["choices"][0]["text"]
-        if isinstance(score, int):
+        try:
             score = int(score)
-        else:
+        except ValueError:
             score = 0
 
         judge_results.append({
@@ -211,7 +310,7 @@ def save_results(results, model_name):
     os.makedirs(output_dir, exist_ok=True)
 
     # Save JSON
-    save_to_json(f"{output_dir}/results.json", results)
+    save_to_json(f"{output_dir}","results.json", results)
 
     # Save Markdown
     with open(f"{output_dir}/README.md", "w", encoding="utf-8") as f:
@@ -273,7 +372,7 @@ def update_readme(model_name, average_score):
 
     print(f"README.md updated with results for {model_name}")
 
-def bench_elyza(repo_id, filename, judge_model="gpt-4o-mini", seed=314159265):
+def bench_elyza_local(repo_id, filename, judge_model="gpt-4o-mini", seed=314159265):
     model_name = f"{repo_id}/{filename}".replace("/", "_")
 
     inference_settings = {
@@ -289,7 +388,38 @@ def bench_elyza(repo_id, filename, judge_model="gpt-4o-mini", seed=314159265):
         "seed": seed,
     }
 
-    eval_results = eval_elyza(repo_id=repo_id, filename=filename, inference_settings=inference_settings)
+    eval_results = eval_elyza_local(repo_id=repo_id, filename=filename, inference_settings=inference_settings)
+    save_to_json(output_dir=f"results/{model_name}/", filename="results.json", data=eval_results)
+
+    if "gpt" in judge_model:
+        judge_results = judge_elyza_gpt(judge_prompt, eval_results, judge_model=judge_model, judge_inference_settings=judge_inference_setteing)
+    else:
+        judge_results = judge_elyza_local(judge_prompt, eval_results, judge_inference_settings=judge_inference_setteing)
+
+    save_results(judge_results, model_name=model_name)
+
+    # Calculate and print average score
+    average_score = sum(result["score"] for result in judge_results) / len(judge_results)
+    print(f"Average score for {model_name}: {average_score:.2f}")
+
+    update_readme(model_name, average_score)
+
+def bench_elyza_api(model, judge_model="gpt-4o-mini", seed=314159265):
+    model_name = model
+
+    inference_settings = {
+        "max_tokens": 1024,
+        "temperature": 1.0,
+        "seed": seed,
+    }
+
+    judge_inference_setteing = {
+        "max_tokens": 1,
+        "temperature": 1.0,
+        "seed": seed,
+    }
+
+    eval_results = eval_elyza_api(model_name, inference_settings)
     save_to_json(output_dir=f"results/{model_name}/", filename="results.json", data=eval_results)
 
     if "gpt" in judge_model:
@@ -315,15 +445,24 @@ def main():
                         help="Model to use for judging (e.g., 'gpt-4o-mini' or a local model)")
     parser.add_argument("--seed", type=int, default=314159265,
                         help="Random seed for reproducibility")
+    parser.add_argument("--api_model", type=str, default=None,
+                    help="api model to be evaluated")
 
     args = parser.parse_args()
 
-    bench_elyza(
-        repo_id=args.repo_id,
-        filename=args.filename,
-        judge_model=args.judge_model,
-        seed=args.seed
-    )
+    if args.api_model == None:
+        bench_elyza_local(
+            repo_id=args.repo_id,
+            filename=args.filename,
+            judge_model=args.judge_model,
+            seed=args.seed
+        )
+    else:
+        bench_elyza_api(
+            model=args.api_model,
+            judge_model=args.judge_model,
+            seed=args.seed
+        )
 
 if __name__ == "__main__":
     main()
