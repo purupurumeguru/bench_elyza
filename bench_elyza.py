@@ -121,9 +121,9 @@ def eval_elyza_local(repo_id, filename, inference_settings=None):
 
 def call_chat_api(prompt, model, max_tokens=1024, temperture=1, seed=314159265, is_return_raw=False, max_retries=3, retry_delay=5, system_prompt=None):
     if "claude" in model:
-        return call_claude_api(prompt, model, max_tokens, temperture, seed, is_return_raw, max_retries, retry_delay, system_prompt)
+        return call_claude_api(prompt=prompt, model=model, max_tokens=max_tokens, temperture=temperture, seed=seed, is_return_raw=is_return_raw, max_retries=max_retries, retry_delay=retry_delay, system_prompt=system_prompt)
     else:
-        return call_gpt_api(prompt, model, max_tokens, temperture, seed, is_return_raw, max_retries, retry_delay, system_prompt)
+        return call_gpt_api(prompt=prompt, model=model, max_tokens=max_tokens, temperture=temperture, seed=seed, is_return_raw=is_return_raw, max_retries=max_retries, retry_delay=retry_delay, system_prompt=system_prompt)
 
 def call_claude_api(prompt, model="claude-3-5-sonnet-20240620", max_tokens=1024, temperture=1, seed=314159265, is_return_raw=False, max_retries=3, retry_delay=5, system_prompt=None):
     if system_prompt is None:
@@ -191,7 +191,9 @@ def eval_elyza_api(model_name, max_retries=3, retry_delay=5, inference_settings=
         output = call_chat_api(
             prompt=input_data,
             model=model_name,
-            max_tokens=max_tokens,
+            max_tokens=inference_settings["max_tokens"],
+            temperture=inference_settings["temperature"],
+            seed=inference_settings["seed"],
             is_return_raw=False,
             max_retries=max_retries,
             retry_delay=retry_delay,
@@ -419,7 +421,7 @@ def bench_elyza_api(model, judge_model="gpt-4o-mini", seed=314159265):
         "seed": seed,
     }
 
-    eval_results = eval_elyza_api(model_name, inference_settings)
+    eval_results = eval_elyza_api(model_name, inference_settings=inference_settings)
     save_to_json(output_dir=f"results/{model_name}/", filename="results.json", data=eval_results)
 
     if "gpt" in judge_model:
