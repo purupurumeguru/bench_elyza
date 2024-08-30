@@ -44,33 +44,31 @@ judge_prompt = """問題, 正解例, 採点基準, 言語モデルが生成し�
 """
 
 def load_model(repo_id, filename):
+    # モデル名に基づいてチャットフォーマットを決定する関数
+    def determine_chat_format(repo_id):
+        repo_id_lower = repo_id.lower()
+        if "llama" in repo_id_lower:
+            return "llama-3"
+        elif "qwen" in repo_id_lower:
+            return "qwen"
+        elif "gemma" in repo_id_lower:
+            return "gemma"  # Gemma用の仮想的なフォーマット名
+        elif "mistral" in repo_id_lower:
+            return "mistral"
+        elif "openchat" in repo_id_lower:
+            return "openchat"
+        else:
+            return "chatml"  # デフォルトとしてChatMLを使用
+
+    chat_format = determine_chat_format(repo_id)
+
     model = Llama.from_pretrained(
         repo_id=repo_id,
         filename=filename,
-        verbose=False
+        verbose=False,
+        chat_format=chat_format
     )
     return model
-
-def add_role(prompt, repo_id):
-    system_prompt = "あなたは誠実で優秀な日本人のアシスタントです。"
-
-    if "llama" in repo_id.lower():
-        return f"<s>[INST] <<SYS>>\n{system_prompt}\n<</SYS>>\n\n{prompt} [/INST]"
-    elif "gemma" in repo_id.lower():
-        return f"<start_of_turn>system\n{system_prompt}<end_of_turn>\n<start_of_turn>user\n{prompt}<end_of_turn>\n<start_of_turn>model\n"
-    elif "mistral" in repo_id.lower():
-        return f"<s>[INST] {system_prompt}\n\n{prompt} [/INST]"
-    elif "phi" in repo_id.lower():
-        return f"Instruct: {system_prompt}\n\nHuman: {prompt}\n\nAssistant:"
-    elif "gpt-neox" in repo_id.lower() or "pythia" in repo_id.lower():
-        return f"<|system|>\n{system_prompt}\n<|user|>\n{prompt}\n<|assistant|>"
-    elif "falcon" in repo_id.lower():
-        return f"System: {system_prompt}\nHuman: {prompt}\nAssistant:"
-    elif "mpt" in repo_id.lower():
-        return f"<|im_start|>system\n{system_prompt}<|im_end|>\n<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant\n"
-    else:
-        # Default case, use Llama format
-        return f"<s>[INST] <<SYS>>\n{system_prompt}\n<</SYS>>\n\n{prompt} [/INST]"
 
 def eval_elyza(repo_id, filename, inference_settings=None):
     if inference_settings is None:
@@ -82,25 +80,30 @@ def eval_elyza(repo_id, filename, inference_settings=None):
             "echo": False,
         }
 
-    model = load_model(repo_id=repo_id, filename=filename)
-    elyza_dataset = load_dataset("elyza/ELYZA-tasks-100")
+    model = load_model(repo_id, filename)
+    if model is None:
+        print("Failed to load model. Exiting evaluation.")
+        return []
 
+    elyza_dataset = load_dataset("elyza/ELYZA-tasks-100")
     eval_results = []
 
     for i, test_data in enumerate(elyza_dataset["test"]):
         input_data = test_data["input"]
-        input_with_role = add_role(input_data, repo_id)
 
-        output = model(
-            prompt=input_with_role,
-            **inference_settings,
-        )
-        output_text = output["choices"][-1]["text"]
+        messages = [
+            {"role": "system", "content": "あなたは誠実で優秀な日本人のアシスタントです。"},
+            {"role": "user", "content": input_data}
+        ]
+        output = model.create_chat_completion(messages=messages, **inference_settings)
+        output_text = output["choices"][-1]["message"]["content"]
+
         print(f"Data {i+1}: ")
         print(input_data)
         print("output")
         print(output_text)
         print("-"*100, flush=True)
+
         eval_results.append({
             "input": input_data,
             "sample_output": test_data["output"],
