@@ -121,11 +121,11 @@ def eval_elyza_local(repo_id, filename, inference_settings=None):
 
 def call_chat_api(prompt, model, max_tokens=1024, temperture=1, seed=314159265, is_return_raw=False, max_retries=3, retry_delay=5, system_prompt=None):
     if "claude" in model:
-        return call_claude_api(prompt=prompt, model=model, max_tokens=max_tokens, temperture=temperture, seed=seed, is_return_raw=is_return_raw, max_retries=max_retries, retry_delay=retry_delay, system_prompt=system_prompt)
+        return call_claude_api(prompt=prompt, model=model, max_tokens=max_tokens, temperture=temperture, is_return_raw=is_return_raw, max_retries=max_retries, retry_delay=retry_delay, system_prompt=system_prompt)
     else:
         return call_gpt_api(prompt=prompt, model=model, max_tokens=max_tokens, temperture=temperture, seed=seed, is_return_raw=is_return_raw, max_retries=max_retries, retry_delay=retry_delay, system_prompt=system_prompt)
 
-def call_claude_api(prompt, model="claude-3-5-sonnet-20240620", max_tokens=1024, temperture=1, seed=314159265, is_return_raw=False, max_retries=3, retry_delay=5, system_prompt=None):
+def call_claude_api(prompt, model="claude-3-5-sonnet-20240620", max_tokens=1024, temperture=1, is_return_raw=False, max_retries=3, retry_delay=5, system_prompt=None):
     if system_prompt is None:
         system_prompt = "あなたは誠実で優秀な日本人のアシスタントです。"
 
@@ -139,7 +139,6 @@ def call_claude_api(prompt, model="claude-3-5-sonnet-20240620", max_tokens=1024,
                 messages=messages,
                 max_tokens=max_tokens,
                 temperature=temperture,
-                seed=seed,
                 system=system_prompt,
             )
             return completion if is_return_raw else completion.content[0].text
