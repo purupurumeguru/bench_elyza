@@ -11,6 +11,14 @@
 | Model | Average Score |
 |-------|---------------|
 | [sample](results/sample/README.md) | 5.00 |
+| gpt-4o-mini | 4.14 |
+| gpt-4o | 4.39 |
+| claude-3-5-sonnet-20240620 | 4.35 |
+| bartowski_gemma-2-9b-it-GGUF_gemma-2-9b-it-Q8_0.gguf | 3.86 |
+| mradermacher_EZO-Common-9B-gemma-2-it-GGUF_EZO-Common-9B-gemma-2-it.Q8_0.gguf | 3.92 |
+| bartowski_Meta-Llama-3.1-8B-Instruct-GGUF_Meta-Llama-3.1-8B-Instruct-Q8_0.gguf | 3.09 |
+| mradermacher_Llama-3.1-8B-EZO-1.1-it-GGUF_Llama-3.1-8B-EZO-1.1-it.Q8_0.gguf | 3.34 |
+| mmnga_Llama-3-ELYZA-JP-8B-gguf_Llama-3-ELYZA-JP-8B-Q8_0.gguf | 3.53 |
 
 # インストール
 
